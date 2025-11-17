@@ -1,5 +1,9 @@
 # AdIntel
 AdIntel is an AI platform that forecasts ad performance, provides statistically backed A/B test analysis, and generates unique user behavior insights to drive smarter marketing decisions. This is a project I built to move beyond simple marketing analytics and create an intelligent tool for ad performance. The goal of AdIntel is to replace guesswork with data-driven certainty.
+<img width="1916" height="874" alt="image" src="https://github.com/user-attachments/assets/e3bcd8b0-f457-4158-8073-034a54e6b24d" />
+<img width="1902" height="888" alt="image" src="https://github.com/user-attachments/assets/4cc3212c-6daa-4528-9507-3e870fd3d3dc" />
+<img width="1902" height="867" alt="image" src="https://github.com/user-attachments/assets/71ace6c1-fcc8-48ec-8731-3bf3ffcca268" />
+<img width="1904" height="865" alt="image" src="https://github.com/user-attachments/assets/0ad0ed81-a823-4969-954b-00a9260df28b" />
 
 I built a full-stack web app that combines two major features:
 
