@@ -209,3 +209,5 @@ __marimo__/
 /data/
 /data/*.parquet
 /data/*.pkl
+# Add this line to your .gitignore
+*.pkl
