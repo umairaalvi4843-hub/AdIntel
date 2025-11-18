@@ -7,8 +7,6 @@ from io import StringIO
 import os
 import time
 
-# --- Configuration & Caching ---
-# @st.cache_resource is used for loading models and resources ONCE
 @st.cache_resource
 def load_assets():
     """Load all model assets from disk."""
@@ -19,7 +17,6 @@ def load_assets():
         'features': 'model_features.pkl'
     }
     
-    # Check if all files exist first
     all_files_found = True
     for f in assets.values():
         if not os.path.exists(f):
@@ -30,7 +27,6 @@ def load_assets():
         st.error("Please download your '.pkl' files from Google Drive (or create them) and place them in the same folder as app.py.")
         return None, None, None, None
 
-    # Load all assets
     try:
         model = joblib.load(assets['model'])
         encoding_maps = joblib.load(assets['maps'])
@@ -43,17 +39,13 @@ def load_assets():
         st.error(f"Error loading model assets: {e}")
         return None, None, None, None
 
-# Load all assets at the start
 model, encoding_maps, global_mean, model_features = load_assets()
-
-# --- Page 1: A/B Test Analyzer ---
 
 def page_ab_test_analyzer():
     """Renders the A/B Test Analyzer page."""
     st.title("🔬 A/B Test Statistical Analyzer")
     st.markdown("Upload your A/B test results to get an instant, statistically valid conclusion.")
     
-    # --- Sidebar for File Upload ---
     st.sidebar.header("A/B Test Data")
     uploaded_file = st.sidebar.file_uploader(
         "Upload A/B Test CSV", 
@@ -61,7 +53,6 @@ def page_ab_test_analyzer():
         help="CSV must contain two columns: 'group' (A or B) and 'click' (0 or 1)."
     )
 
-    # --- Load Data ---
     if uploaded_file is not None:
         try:
             df = pd.read_csv(uploaded_file)
@@ -73,13 +64,11 @@ def page_ab_test_analyzer():
         df = generate_sample_data()
         st.sidebar.info("Using built-in sample data for demonstration.")
 
-    # --- Data Validation Check ---
     required_cols = ['group', 'click']
     if not all(col in df.columns for col in required_cols):
         st.error(f"❌ Error: CSV must contain columns named 'group' and 'click'.")
         return
     
-    # Ensure click column is numeric
     try:
         df['click'] = pd.to_numeric(df['click'])
     except ValueError:
@@ -88,19 +77,16 @@ def page_ab_test_analyzer():
 
     st.subheader("📊 Campaign Performance Metrics")
     
-    # --- (This is the CORRECTED code for metrics) ---
     metrics = df.groupby('group').agg(
         Impressions=('click', 'count'),
         Clicks=('click', 'sum'),
         CTR=('click', 'mean')
     ).reset_index()
-    # ---------------------------------------------
     
     metrics['CTR_Formatted'] = (metrics['CTR'] * 100).round(3).astype(str) + '%'
     
     col1, col2 = st.columns(2)
     try:
-        # Handle cases where only one group might be present
         if 'A' in metrics['group'].values:
             metrics_a = metrics[metrics['group'] == 'A'].iloc[0]
             with col1:
@@ -129,7 +115,6 @@ def page_ab_test_analyzer():
     if p_value is not None and observed is not None:
         display_verdict(p_value)
         st.markdown("##### Observed Click Counts")
-        # Ensure observed table has correct labels
         try:
             st.table(pd.DataFrame(observed, columns=['No Click (0)', 'Click (1)'], index=['Group A', 'Group B']))
         except Exception:
@@ -137,7 +122,7 @@ def page_ab_test_analyzer():
     else:
         st.error("Error running test: Data must contain exactly two groups (e.g., 'A' and 'B').")
 
-# --- Page 2: Live CTR Predictor ---
+
 
 def page_live_predictor():
     """Renders the Live CTR Predictor page."""
@@ -148,7 +133,6 @@ def page_live_predictor():
         st.error("Model assets are not loaded. Cannot provide predictions. Check file paths and errors on startup.")
         return
 
-    # --- Create Input Form for Ad Features ---
     with st.form(key='prediction_form'):
         st.subheader("Ad Context Features")
         
@@ -182,16 +166,13 @@ def page_live_predictor():
             user_ad_count = st.number_input("How many ads has this user seen today?", min_value=0, value=5)
             device_id = st.text_input("Device ID", value="a99f214a") # A common example ID
         with col4:
-            # We simplify by grouping the C-features
             c14 = st.selectbox("C14", options=c14_keys, index=0)
             c17 = st.selectbox("C17", options=c17_keys, index=0)
             c20 = st.selectbox("C20", options=c20_keys, index=0)
 
         submit_button = st.form_submit_button(label='Predict CTR')
 
-    # --- Process Prediction ---
     if submit_button:
-        # 1. Create a single-row DataFrame from the user's input
         input_data = {
             'banner_pos': banner_pos,
             'site_category': site_category,
@@ -212,39 +193,28 @@ def page_live_predictor():
             'user_ad_count': user_ad_count,
         }
         
-        # 2. Apply the Target Encoding
         for col, mapping in encoding_maps.items():
             raw_value = input_data.get(col)
             input_data[f"{col}_encoded"] = mapping.get(raw_value, global_mean)
             
-        # 3. Create the final DataFrame
         final_input_df = pd.DataFrame([input_data])
         
-        # Add any missing features
         for col in model_features:
             if col not in final_input_df.columns:
                 final_input_df[col] = 0 
                 
-        # Keep only the features the model was trained on
         final_input_df = final_input_df[model_features]
         
-        # --- (THIS IS THE FIX) ---
-        # Force all columns to the correct data type
-        # The model expects 'hour_of_day' as a category, and all others as numbers (float).
+       
         for col in final_input_df.columns:
             if col == 'hour_of_day':
-                # Manually set the column to the 'category' dtype
                 final_input_df[col] = final_input_df[col].astype('category')
             else:
-                # Manually set all other feature columns to 'float'
                 final_input_df[col] = final_input_df[col].astype(float)
-        # --- (END OF FIX) ---
-
-        # 4. Make the prediction
+       
         prediction_proba = model.predict_proba(final_input_df)[0, 1] 
         prediction_percent = prediction_proba * 100
 
-        # 5. Display the result
         st.subheader("📈 Predicted Click-Through Rate")
         st.metric(label="Click Probability", value=f"{prediction_percent:.2f}%")
         
@@ -252,7 +222,6 @@ def page_live_predictor():
             st.dataframe(final_input_df)
             st.dataframe(final_input_df.dtypes.astype(str), column_config={"0": "Data Type"})
 
-# --- Helper functions for A/B Test Page ---
 def generate_sample_data():
     """Creates a sample A/B test dataset with a statistically significant difference."""
     np.random.seed(42)
@@ -268,17 +237,15 @@ def run_chi_squared_test(df_results):
     
     contingency_table = df_results.groupby('group')['click'].value_counts().unstack(fill_value=0)
     
-    # Ensure both 0 and 1 columns exist
+   
     if 0 not in contingency_table.columns: contingency_table[0] = 0
     if 1 not in contingency_table.columns: contingency_table[1] = 0
         
-    # Ensure both A and B rows exist after grouping (for safety)
     if 'A' not in contingency_table.index: contingency_table.loc['A'] = 0
     if 'B' not in contingency_table.index: contingency_table.loc['B'] = 0
         
     observed = contingency_table.loc[['A', 'B'], [0, 1]].values
     
-    # Check if any row sums are zero, which makes chi2 invalid
     if observed.sum(axis=1).any() == 0:
         return None, None, None
         
@@ -294,11 +261,9 @@ def display_verdict(p_value):
     else:
         st.warning(f"⚠️ The difference is **NOT STATISTICALLY SIGNIFICANT**.")
 
-# --- Main App Router ---
 def main():
     st.set_page_config(page_title="AdIntel Dashboard", layout="wide")
     
-    # Simple navigation in the sidebar
     st.sidebar.title("AdIntel Navigation")
     page = st.sidebar.radio("Choose a tool", ["A/B Test Analyzer", "Live CTR Predictor"])
     st.sidebar.markdown("---")
